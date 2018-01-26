@@ -22,12 +22,15 @@ app.listen(PORT);*/
 
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
-import { graphqlExpress } from 'apollo-server-express';
+import { graphiqlExpress, graphqlExpress } from 'apollo-server-express';
 import * as cors from 'cors';
 import * as passport from 'passport';
 import { db, getRandomId, User } from "./db";
 import * as basicStrategy from 'passport-http';
 import * as bcrypt from 'bcrypt-nodejs';
+import { createServer } from 'http';
+import { SubscriptionServer } from 'subscriptions-transport-ws';
+import { execute, subscribe } from 'graphql';
 
 const PORT = 3000;
 
@@ -97,9 +100,47 @@ app.use('/graphql', graphqlExpress(req => ({
   context: req,
 })));
 
+app.use('/graphiql', graphiqlExpress({
+  endpointURL: '/graphql',
+  subscriptionsEndpoint: `ws://localhost:3000/subscriptions`,
+}));
+
 function loggingMiddleware(req: any, res: any, next: any) {
   //console.log(req.user);
   next();
 }
 
-app.listen(PORT);
+//app.listen(PORT);
+
+// Wrap the Express server
+const ws = createServer(app);
+ws.listen(PORT, () => {
+  console.log(`Apollo Server is now running on http://localhost:${PORT}`);
+  // Set up the WebSocket for handling GraphQL subscriptions
+  new SubscriptionServer({
+    onConnect: (connectionParams: any, webSocket: any) => {
+      if (connectionParams.authToken) {
+        // create a buffer and tell it the data coming in is base64
+        const buf = new Buffer(connectionParams.authToken.split(' ')[1], 'base64');
+        // read it back out as a string
+        const [username, password]: string[] = buf.toString().split(':');
+        if (username && password) {
+          const user = db.users
+            .filter(user => user.username === username && validPassword(password, user.password))[0];
+
+          if (user) {
+            return {user};
+          }
+        }
+      }
+
+      throw new Error('Missing auth token!');
+    },
+    execute,
+    subscribe,
+    schema
+  }, {
+    server: ws,
+    path: '/subscriptions',
+  });
+});

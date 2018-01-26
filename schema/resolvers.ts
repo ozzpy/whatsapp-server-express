@@ -5,9 +5,11 @@ import {
   RemoveChatMutationArgs, RemoveMessagesMutationArgs
 } from "../types";
 import * as moment from "moment";
+import { PubSub, withFilter } from 'graphql-subscriptions';
 
 let users = db.users;
 let chats = db.chats;
+export const pubsub = new PubSub();
 
 export const resolvers: IResolvers = {
   Query: {
@@ -22,7 +24,7 @@ export const resolvers: IResolvers = {
         throw new Error(`Recipient ${recipientId} doesn't exist.`);
       }
 
-      const chat = chats.find(chat => !chat.name && chat.userIds.includes(currentUserId) && chat.userIds.includes(recipientId));
+      let chat = chats.find(chat => !chat.name && chat.userIds.includes(currentUserId) && chat.userIds.includes(recipientId));
       if (chat) {
         // Chat already exists. Both users are already in the userIds array
         const chatId = chat.id;
@@ -30,14 +32,13 @@ export const resolvers: IResolvers = {
           // The chat isn't listed for the current user. Add him to the memberIds
           chat.listingIds.push(currentUserId);
           chats.find(chat => chat.id === chatId)!.listingIds.push(currentUserId);
-          return chat;
         } else {
           throw new Error(`Chat already exists.`);
         }
       } else {
         // Create the chat
         const id = (chats.length && String(Number(chats[chats.length - 1].id) + 1)) || '1';
-        const chat: Chat = {
+        chat = {
           id,
           name: null,
           picture: null,
@@ -50,8 +51,9 @@ export const resolvers: IResolvers = {
           messages: [],
         };
         chats.push(chat);
-        return chat;
       }
+
+      return chat;
     },
     addGroup: (obj: any, {recipientIds, groupName}: AddGroupMutationArgs, {user: {id: currentUserId}}: {user: User}) => {
       recipientIds.forEach(recipientId => {
@@ -192,12 +194,12 @@ export const resolvers: IResolvers = {
         if (!chat.listingIds.find(listingId => listingId === recipientId)) {
           // Chat is not listed for the recipient. Add him to the listingIds
           const listingIds = chat.listingIds.concat(recipientId);
+          chat = {...chat, listingIds};
 
-          chats = chats.map(chat => {
-            if (chat.id === chatId) {
-              chat = {...chat, listingIds};
-            }
-            return chat;
+          chats = chats.map(_chat => _chat.id === chatId ? chat! : _chat);
+
+          pubsub.publish('chatAdded', {
+            chatAdded: {...chat, creatorId: currentUserId}
           });
 
           holderIds = listingIds;
@@ -242,6 +244,10 @@ export const resolvers: IResolvers = {
         return chat;
       });
 
+      pubsub.publish('messageAdded', {
+        messageAdded: {...message, chatId}
+      });
+
       return message;
     },
     removeMessages: (obj: any, {chatId, messageIds, all}: RemoveMessagesMutationArgs, {user: {id: currentUserId}}: {user: User}) => {
@@ -283,6 +289,21 @@ export const resolvers: IResolvers = {
       return deletedIds;
     },
   },
+  Subscription: {
+    messageAdded: {
+      subscribe: withFilter(() => pubsub.asyncIterator('messageAdded'),
+        (payload, variables, {user: {id: currentUserId}}: { user: User }) => {
+          return (!variables.chatId || payload.messageAdded.chatId === variables.chatId) &&
+            !!payload.messageAdded.recipients.filter((recipient: Recipient) => recipient.id === currentUserId)[0];
+        }),
+    },
+    chatAdded: {
+      subscribe: withFilter(() => pubsub.asyncIterator('chatAdded'),
+        (payload, variables, {user: {id: currentUserId}}: { user: User }) => {
+          return payload.chatAdded.creatorId !== currentUserId && payload.chatAdded.listingIds.includes(currentUserId);
+        }),
+    }
+  },
   Chat: {
     name: (chat: Chat, args: any, {user: {id: currentUserId}}: {user: User}) => chat.name ? chat.name : users
       .find(user => user.id === chat.userIds.find(userId => userId !== currentUserId))!.name,
@@ -303,5 +324,7 @@ export const resolvers: IResolvers = {
   Message: {
     sender: (message: Message) => users.find(user => user.id === message.senderId),
     ownership: (message: Message, args: any, {user: {id: currentUserId}}: {user: User}) => message.senderId === currentUserId,
+    chatId: (message: Message) => (<any>message).chatId ||
+      chats.filter(chat => !!chat.messages.filter(_message => _message.id === message.id)[0])[0].id,
   },
 };

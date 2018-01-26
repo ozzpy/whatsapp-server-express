@@ -6,6 +6,11 @@ export const typeDefs: ITypeDefinitions = `
     chats: [Chat!]
     chat(chatId: ID!): Chat
   }
+  
+  type Subscription {
+    messageAdded(chatId: ID): Message
+    chatAdded: Chat
+  }
 
   enum MessageType {
     TEXT
@@ -43,6 +48,7 @@ export const typeDefs: ITypeDefinitions = `
     id: ID!
     senderId: ID!
     sender: User!
+    chatId: ID!
     content: String!
     createdAt: Int
     #FIXME: should return MessageType
