@@ -26,16 +26,16 @@ export const typeDefs: ITypeDefinitions = `
     #Computed for chats
     picture: String
     #All members, current and past ones.
-    userIds: [ID!]!
+    allTimeMembers: [User!]!
     #Whoever gets the chat listed. For groups includes past members who still didn't delete the group.
-    listingIds: [ID!]!
+    listingMembers: [User!]!
     #Actual members of the group (they are not the only ones who get the group listed). Null for chats.
-    memberIds: [ID!]!
+    actualGroupMembers: [User!]!
     #Null for chats
-    adminIds: [ID!]
+    admins: [User!]
     #If null the group is read-only. Null for chats.
-    ownerId: ID!
-    messages: [Message]!
+    owner: User!
+    messages(amount: Int): [Message]!
     #Computed property
     lastMessage: Message
     #Computed property
@@ -46,26 +46,25 @@ export const typeDefs: ITypeDefinitions = `
 
   type Message {
     id: ID!
-    senderId: ID!
     sender: User!
-    chatId: ID!
+    chat: Chat!
     content: String!
-    createdAt: Int
+    createdAt: String!
     #FIXME: should return MessageType
     type: Int!
     #Whoever received the message
     recipients: [Recipient!]!
     #Whoever still holds a copy of the message. Cannot be null because the message gets deleted otherwise
-    holderIds: [ID!]!
+    holders: [User!]!
     #Computed property
     ownership: Boolean!
   }
   
   type Recipient {
-    #The user id
-    id: ID!
-    receivedAt: Int
-    readAt: Int
+    user: User!
+    message: Message!
+    receivedAt: String
+    readAt: String
   }
 
   type User {
@@ -81,9 +80,9 @@ export const typeDefs: ITypeDefinitions = `
     removeChat(chatId: ID!): ID
     addMessage(chatId: ID!, content: String!): Message
     removeMessages(chatId: ID!, messageIds: [ID], all: Boolean): [ID]
-    addMembers(groupId: ID!, userIds: [ID!]!): [ID]
+    addMembers(groupId: ID!, userIds: [ID!]!): [User]
     removeMembers(groupId: ID!, userIds: [ID!]!): [ID]
-    addAdmins(groupId: ID!, userIds: [ID!]!): [ID]
+    addAdmins(groupId: ID!, userIds: [ID!]!): [User]
     removeAdmins(groupId: ID!, userIds: [ID!]!): [ID]
     setGroupName(groupId: ID!): String
     setGroupPicture(groupId: ID!): String
