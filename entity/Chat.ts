@@ -51,7 +51,7 @@ export class Chat {
   @Column({nullable: true})
   picture: string;
 
-  @ManyToMany(type => User, user => user.allTimeMemberChats, {eager: false})
+  @ManyToMany(type => User, user => user.allTimeMemberChats, {cascade: true, eager: false})
   @JoinTable()
   allTimeMembers: User[];
 
@@ -59,16 +59,16 @@ export class Chat {
   @JoinTable()
   listingMembers: User[];
 
-  @ManyToMany(type => User, user => user.actualGroupMemberChats, {eager: false})
+  @ManyToMany(type => User, user => user.actualGroupMemberChats, {cascade: true, eager: false})
   @JoinTable()
   actualGroupMembers?: User[];
 
-  @ManyToMany(type => User, user => user.adminChats, {eager: false})
+  @ManyToMany(type => User, user => user.adminChats, {cascade: true, eager: false})
   @JoinTable()
   admins?: User[];
 
-  @ManyToOne(type => User, user => user.ownerChats, {eager: false})
-  owner?: User;
+  @ManyToOne(type => User, user => user.ownerChats, {cascade: true, eager: false})
+  owner?: User | null;
 
   @OneToMany(type => Message, message => message.chat, {cascade: true, eager: true})
   messages: Message[];

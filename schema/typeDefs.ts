@@ -34,7 +34,7 @@ export const typeDefs: ITypeDefinitions = `
     #Null for chats
     admins: [User!]
     #If null the group is read-only. Null for chats.
-    owner: User!
+    owner: User
     messages(amount: Int): [Message]!
     #Computed property
     lastMessage: Message

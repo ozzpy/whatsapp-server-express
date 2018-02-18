@@ -21,7 +21,7 @@ export interface Chat {
   listingMembers: User[]; /* Whoever gets the chat listed. For groups includes past members who still didn&#x27;t delete the group. */
   actualGroupMembers: User[]; /* Actual members of the group (they are not the only ones who get the group listed). Null for chats. */
   admins: User[]; /* Null for chats */
-  owner: User; /* If null the group is read-only. Null for chats. */
+  owner?: User | null; /* If null the group is read-only. Null for chats. */
   messages: Message[]; 
   lastMessage?: Message | null; /* Computed property */
   unreadMessages: number; /* Computed property */
@@ -33,7 +33,7 @@ export interface Message {
   sender: User; 
   chat: Chat; 
   content: string; 
-  createdAt?: number | null; 
+  createdAt: string; 
   type: number; /* FIXME: should return MessageType */
   recipients: Recipient[]; /* Whoever received the message */
   holders: User[]; /* Whoever still holds a copy of the message. Cannot be null because the message gets deleted otherwise */
@@ -43,8 +43,8 @@ export interface Message {
 export interface Recipient {
   user: User; 
   message: Message; 
-  receivedAt?: number | null; 
-  readAt?: number | null; 
+  receivedAt?: string | null; 
+  readAt?: string | null; 
 }
 
 export interface Mutation {
